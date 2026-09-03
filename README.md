@@ -1,7 +1,7 @@
 # flip-github
 
-`flip-github` captures a GitHub issue or pull request as an evolving source,
-not just an opening post. It is a zero-runtime-dependency fetcher for
+`flip-github` captures a GitHub issue, pull request or Discussion as an
+evolving source, not just an opening post. It is a zero-runtime-dependency fetcher for
 [Flip](https://github.com/lavallee/flip) notebooks and a small Flip plugin with
 a repeatable source-refresh workflow.
 
@@ -15,13 +15,15 @@ after the record says otherwise.
 - the issue or pull request's state at retrieval time;
 - every paginated issue comment;
 - pull-request merge state, reviews, and inline review comments;
+- every paginated Discussion comment and reply, plus the chosen answer;
 - lifecycle events, including closures, reopenings, and cross-references;
 - the complete raw API responses alongside a readable normalized view; and
 - a Flip return envelope with the `publisher-api` capture method.
 
-The command fails if GitHub's declared issue-comment count does not match what
-pagination returned. That is a narrow completeness check for the source
-artifact, not a claim that the discussion is correct.
+The command fails if GitHub's declared issue-comment, Discussion-comment or
+reply count does not match what pagination returned. That is a narrow
+completeness check for the source artifact, not a claim that the discussion is
+correct.
 
 ## Install
 
@@ -31,9 +33,10 @@ Python 3.12 or newer is required.
 uv tool install git+https://github.com/lavallee/flip-github
 ```
 
-Public repositories work without authentication at GitHub's lower anonymous
-rate limit. Set `GITHUB_TOKEN` or `GH_TOKEN` in the environment for a higher
-limit or repositories the token may access. Tokens are sent only in the API
+Public issues and pull requests work without authentication at GitHub's lower
+anonymous REST rate limit. Discussions use GitHub's GraphQL API and require
+`GITHUB_TOKEN` or `GH_TOKEN`; authenticated captures get a higher limit and may
+access repositories allowed by that token. Tokens are sent only in the API
 authorization header and are never written to captures.
 
 ## Configure Flip
@@ -50,6 +53,9 @@ Capture a source:
 ```bash
 flip add-source https://github.com/omacom/omarchy/issues/6380 \
   --kind web --via github
+
+flip add-source https://github.com/omacom/omarchy/discussions/6264 \
+  --kind web --via github
 ```
 
 Refresh it before publishing a claim that depends on current state:
@@ -59,9 +65,10 @@ flip source recheck A12 --via github
 ```
 
 Open `sources/raw/<source-id>/<capture>/capture.json` and read the `source`,
-`comments`, `reviews`, `review_comments`, and `timeline` sections. The `text`
-field presents the same evidence as readable Markdown for structured-text
-extractors.
+`comments`, `reviews`, `review_comments`, and `timeline` sections. Discussion
+comments contain their complete `replies` arrays, and the `discussion` block
+records answer state. The `text` field presents the same evidence as readable
+Markdown for structured-text extractors.
 
 ## Use the Flip plugin
 
@@ -83,11 +90,13 @@ fetchers.
 
 ## Interpret the result
 
-Repository state and real-world outcome are different fields:
+Repository state, answer state and real-world outcome are different fields:
 
 - closed does not necessarily mean fixed;
 - merged means code entered the pull request's base branch, not necessarily a
   release;
+- a chosen Discussion answer is useful project or community evidence, not an
+  automatic substitute for an exact-machine owner retest;
 - an owner saying a fix worked is stronger than an unexplained closure, but is
   still one report; and
 - later contrary reports may indicate a regression, configuration difference,
@@ -101,8 +110,8 @@ record.
 ## Development
 
 The tests cover only the failure modes this tool exists to prevent: missing a
-later paginated fix comment, losing pull-request review/merge state, or
-accepting an incomplete comment set.
+later paginated fix comment or Discussion reply, losing pull-request
+review/merge or Discussion answer state, or accepting an incomplete thread.
 
 ```bash
 PYTHONPATH=src python -m unittest discover -s tests -v

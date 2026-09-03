@@ -1,4 +1,3 @@
-"""Complete GitHub issue and pull-request capture for Flip."""
+"""Complete GitHub issue, pull-request, and discussion capture for Flip."""
 
-__version__ = "0.1.0"
-
+__version__ = "0.2.0"

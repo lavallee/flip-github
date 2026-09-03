@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flip-github"
-version = "0.1.0"
-description = "Capture complete GitHub issue and pull-request evidence for Flip notebooks"
+version = "0.2.0"
+description = "Capture complete GitHub issue, pull-request, and discussion evidence for Flip"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
@@ -36,4 +36,3 @@ packages = ["src/flip_github"]
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-

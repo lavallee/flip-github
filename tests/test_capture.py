@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from flip_github.cli import CaptureError, GitHubClient, capture
@@ -37,6 +37,131 @@ class FixtureOpener:
             raise AssertionError(f"unexpected request: {request.full_url}") from error
 
 
+class DiscussionFixtureClient:
+    def __init__(self):
+        self.calls = []
+
+    def graphql(self, query, variables):
+        self.calls.append((query, variables))
+        if "DiscussionReplies" in query:
+            return {
+                "data": {
+                    "node": {
+                        "replies": {
+                            "totalCount": 2,
+                            "pageInfo": {"hasNextPage": False, "endCursor": "reply-2"},
+                            "nodes": [
+                                {
+                                    "id": "reply-2",
+                                    "databaseId": 12,
+                                    "url": "https://github.com/acme/widget/discussions/9#discussioncomment-12",
+                                    "body": "The later owner confirms the workaround.",
+                                    "createdAt": "2026-09-03T00:00:00Z",
+                                    "updatedAt": "2026-09-03T00:00:00Z",
+                                    "isAnswer": True,
+                                    "author": {
+                                        "login": "second-owner",
+                                        "url": "https://github.com/second-owner",
+                                        "__typename": "User",
+                                    },
+                                    "authorAssociation": "NONE",
+                                    "replyTo": {"id": "comment-1"},
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+        return {
+            "data": {
+                "repository": {
+                    "nameWithOwner": "acme/widget",
+                    "discussion": {
+                        "id": "discussion-9",
+                        "number": 9,
+                        "title": "Does suspend work?",
+                        "url": "https://github.com/acme/widget/discussions/9",
+                        "body": "The opening post says no.",
+                        "createdAt": "2026-08-01T00:00:00Z",
+                        "updatedAt": "2026-09-03T00:00:00Z",
+                        "closed": True,
+                        "closedAt": "2026-09-03T00:00:00Z",
+                        "stateReason": "RESOLVED",
+                        "locked": False,
+                        "author": {
+                            "login": "owner",
+                            "url": "https://github.com/owner",
+                            "__typename": "User",
+                        },
+                        "authorAssociation": "NONE",
+                        "category": {
+                            "name": "Q&A",
+                            "slug": "q-a",
+                            "isAnswerable": True,
+                        },
+                        "isAnswered": True,
+                        "answer": {
+                            "id": "reply-2",
+                            "url": "https://github.com/acme/widget/discussions/9#discussioncomment-12",
+                        },
+                        "answerChosenAt": "2026-09-03T00:00:00Z",
+                        "answerChosenBy": {
+                            "login": "owner",
+                            "url": "https://github.com/owner",
+                            "__typename": "User",
+                        },
+                        "comments": {
+                            "totalCount": 1,
+                            "pageInfo": {"hasNextPage": False, "endCursor": "comment-1"},
+                            "nodes": [
+                                {
+                                    "id": "comment-1",
+                                    "databaseId": 11,
+                                    "url": "https://github.com/acme/widget/discussions/9#discussioncomment-11",
+                                    "body": "Try the new release.",
+                                    "createdAt": "2026-09-02T00:00:00Z",
+                                    "updatedAt": "2026-09-02T00:00:00Z",
+                                    "isAnswer": False,
+                                    "author": {
+                                        "login": "helper",
+                                        "url": "https://github.com/helper",
+                                        "__typename": "User",
+                                    },
+                                    "authorAssociation": "CONTRIBUTOR",
+                                    "replies": {
+                                        "totalCount": 2,
+                                        "pageInfo": {
+                                            "hasNextPage": True,
+                                            "endCursor": "reply-1",
+                                        },
+                                        "nodes": [
+                                            {
+                                                "id": "reply-1",
+                                                "databaseId": 10,
+                                                "url": "https://github.com/acme/widget/discussions/9#discussioncomment-10",
+                                                "body": "The first reply is inconclusive.",
+                                                "createdAt": "2026-09-02T12:00:00Z",
+                                                "updatedAt": "2026-09-02T12:00:00Z",
+                                                "isAnswer": False,
+                                                "author": {
+                                                    "login": "owner",
+                                                    "url": "https://github.com/owner",
+                                                    "__typename": "User",
+                                                },
+                                                "authorAssociation": "NONE",
+                                                "replyTo": {"id": "comment-1"},
+                                            }
+                                        ],
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                }
+            }
+        }
+
+
 def issue_record(*, comments, state="open", pull=False):
     record = {
         "number": 7,
@@ -60,6 +185,22 @@ def issue_record(*, comments, state="open", pull=False):
 
 
 class CaptureTests(unittest.TestCase):
+    def test_discussion_keeps_paginated_replies_and_chosen_answer(self):
+        client = DiscussionFixtureClient()
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = capture(
+                "https://github.com/acme/widget/discussions/9",
+                tmp,
+                client=client,
+                now=datetime(2026, 9, 3, tzinfo=UTC),
+            )
+
+        self.assertEqual(artifact["source"]["state"], "closed")
+        self.assertTrue(artifact["discussion"]["is_answered"])
+        self.assertEqual(artifact["replies_expected"], 2)
+        self.assertEqual(len(artifact["comments"][0]["replies"]), 2)
+        self.assertIn("later owner confirms", artifact["text"])
+
     def test_closed_issue_keeps_paginated_owner_fix_comment(self):
         first_page = "https://api.github.com/repos/acme/widget/issues/7/comments?per_page=100"
         second_page = (
@@ -109,7 +250,7 @@ class CaptureTests(unittest.TestCase):
                 "https://github.com/acme/widget/issues/7",
                 tmp,
                 client=client,
-                now=datetime(2026, 9, 2, tzinfo=timezone.utc),
+                now=datetime(2026, 9, 2, tzinfo=UTC),
             )
             sidecar = json.loads((Path(tmp) / "flip.json").read_text())
 
@@ -150,7 +291,7 @@ class CaptureTests(unittest.TestCase):
                 "https://github.com/acme/widget/pull/7",
                 tmp,
                 client=GitHubClient(opener=opener),
-                now=datetime(2026, 9, 2, tzinfo=timezone.utc),
+                now=datetime(2026, 9, 2, tzinfo=UTC),
             )
 
         self.assertEqual(artifact["source"]["state"], "merged")
@@ -179,4 +320,3 @@ class CaptureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

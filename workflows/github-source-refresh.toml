@@ -1,6 +1,6 @@
 id = "github-source-refresh"
-version = "0.1"
-summary = "Refresh a GitHub issue or pull request before relying on its current state."
+version = "0.2"
+summary = "Refresh a GitHub issue, pull request, or Discussion before relying on its current state."
 entry = "orient"
 
 [[phase]]
@@ -17,7 +17,7 @@ next = "read"
 
 [[phase]]
 id = "read"
-guide = "Read the original report, current state, all comments, reviews, and lifecycle events."
+guide = "Read the original report, current state, all comments and replies, reviews, answer state, and lifecycle events."
 produces = ["current-source-reading"]
 next = "classify"
 
@@ -31,4 +31,3 @@ next = "update"
 id = "update"
 guide = "Update the claim or publication, record the retrieval date, and leave a reopen trigger for future source changes."
 produces = ["updated-claim-or-publication", "recheck-trigger"]
-

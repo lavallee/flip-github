@@ -1,7 +1,7 @@
 [plugin]
 id = "lavallee/github-evidence"
-version = "0.1.0"
-summary = "Keep GitHub issue and pull-request evidence current through complete API captures."
+version = "0.2.0"
+summary = "Keep GitHub issue, pull-request, and discussion evidence current through complete API captures."
 license = "MIT"
 requires_flip = ">=0.22"
 capabilities = ["definitions"]

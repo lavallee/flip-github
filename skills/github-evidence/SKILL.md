@@ -1,6 +1,6 @@
 ---
 name: github-evidence
-description: Capture and interpret GitHub issues and pull requests when current state, comments, reviews, fixes, regressions, or release status matter.
+description: Capture and interpret GitHub issues, pull requests, and Discussions when current state, comments, replies, reviews, fixes, regressions, or release status matter.
 ---
 
 # github-evidence
@@ -14,16 +14,19 @@ current answer.
 3. Capture a new source with
    `flip add-source <github-url> --kind web --via github`, or refresh existing
    custody with `flip source recheck <source-id> --via github`.
-4. Open `capture.json`. Confirm `comments_complete` is true, then read the
-   original body, current state, every issue comment, pull-request reviews and
-   inline comments when present, and the lifecycle timeline. Do not grade or
-   cite the source from the opening body alone.
+4. Open `capture.json`. Confirm `comments_complete` is true and, for a
+   Discussion, `replies_complete` is true. Read the original body, current
+   state, every issue comment or Discussion reply, pull-request reviews and
+   inline comments when present, the chosen answer, and the lifecycle timeline.
+   Do not grade or cite the source from the opening body alone.
 5. Classify what the whole record establishes:
    - `open` and `closed` are repository states, not conclusions;
    - call an issue fixed only when the discussion, linked change, or owner
      follow-up establishes the fix;
    - a merged pull request establishes that code entered its base branch, not
      that a release containing it reached users;
+   - a chosen Discussion answer records community or project judgment, not
+     necessarily an exact-machine retest;
    - distinguish duplicate, declined, stale, cannot-reproduce, workaround,
      fixed, released, and owner-confirmed working outcomes;
    - keep conflicting later reports visible as possible regressions.
@@ -36,4 +39,3 @@ current answer.
 The adapter preserves current public API responses. It cannot recover deleted
 or pre-edit content, prove that a commenter is correct, or turn repository
 closure into evidence that a fix shipped.
-
