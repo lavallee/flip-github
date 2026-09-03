@@ -66,8 +66,9 @@ extractors.
 ## Use the Flip plugin
 
 The repository also transports an agent skill and a source-refresh workflow.
-Linking only registers the materialized directory; it does not enable an
-executable hook.
+That optional plugin bundle requires Flip 0.22 or newer. Linking only registers
+the materialized directory; it does not enable an executable hook. The
+`flip-github` capture command itself remains independent of the plugin registry.
 
 ```bash
 flip plugin doctor /path/to/flip-github
