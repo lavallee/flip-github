@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "flip-github"
+version = "0.1.0"
+description = "Capture complete GitHub issue and pull-request evidence for Flip notebooks"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Marc Lavallee" }]
+keywords = ["flip", "github", "research", "provenance", "journalism"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Documentation",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/lavallee/flip-github"
+Repository = "https://github.com/lavallee/flip-github"
+Issues = "https://github.com/lavallee/flip-github/issues"
+
+[project.scripts]
+flip-github = "flip_github.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/flip_github"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+

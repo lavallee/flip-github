@@ -1,0 +1,34 @@
+id = "github-source-refresh"
+version = "0.1"
+summary = "Refresh a GitHub issue or pull request before relying on its current state."
+entry = "orient"
+
+[[phase]]
+id = "orient"
+guide = "Identify the GitHub source and the reader-facing claim that depends on it."
+produces = ["source-and-dependent-claim"]
+next = "capture"
+
+[[phase]]
+id = "capture"
+guide = "Capture or recheck the source through the github lane; do not proceed with a partial comment set."
+produces = ["complete-api-capture"]
+next = "read"
+
+[[phase]]
+id = "read"
+guide = "Read the original report, current state, all comments, reviews, and lifecycle events."
+produces = ["current-source-reading"]
+next = "classify"
+
+[[phase]]
+id = "classify"
+guide = "Distinguish open, closed, fixed, merged, released, regressed, and unresolved; preserve what the evidence cannot establish."
+produces = ["evidence-state"]
+next = "update"
+
+[[phase]]
+id = "update"
+guide = "Update the claim or publication, record the retrieval date, and leave a reopen trigger for future source changes."
+produces = ["updated-claim-or-publication", "recheck-trigger"]
+
