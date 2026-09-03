@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "flip-github"
-version = "0.2.0"
+version = "0.3.0"
 description = "Capture complete GitHub issue, pull-request, and discussion evidence for Flip"
 readme = "README.md"
 requires-python = ">=3.12"

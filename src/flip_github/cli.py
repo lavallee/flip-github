@@ -1,13 +1,14 @@
 """Capture a GitHub issue, pull request, or discussion through the public API.
 
-The artifact deliberately keeps both a compact normalized view and the raw API
-responses. The normalized view is easy to inspect; the raw responses prevent a
-new GitHub field from being silently discarded before Flip takes custody.
+The content artifact is a compact normalized view of the record and its full
+conversation. Complete API responses live in a separate raw artifact so
+unrelated repository metadata cannot create a false editorial change.
 """
 
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import os
 import re
@@ -403,7 +404,6 @@ def _render_markdown(artifact: dict[str, Any]) -> str:
         f"- Created: {source.get('created_at') or 'unknown'}",
         f"- Updated: {source.get('updated_at') or 'unknown'}",
         f"- Closed: {source.get('closed_at') or 'not closed'}",
-        f"- Captured: {artifact['fetched_at']}",
     ]
     if source.get("state_reason"):
         lines.append(f"- State reason: {source['state_reason']}")
@@ -642,8 +642,8 @@ def _capture_discussion(
             f"{expected_comments} discussion comments but the API returned {len(raw_comments)}"
         )
 
-    fetched_at = (now or datetime.now(UTC)).astimezone(UTC)
-    fetched_text = fetched_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+    retrieved_at = (now or datetime.now(UTC)).astimezone(UTC)
+    retrieved_text = retrieved_at.strftime("%Y-%m-%dT%H:%M:%SZ")
     state = "closed" if discussion_record.get("closed") else "open"
     category = (
         discussion_record.get("category")
@@ -681,10 +681,9 @@ def _capture_discussion(
         "answer_chosen_by": _graphql_user(discussion_record.get("answerChosenBy")),
     }
     artifact: dict[str, Any] = {
-        "schema_version": "flip.github-capture/1",
+        "schema_version": "flip.github-capture/2",
         "input_url": target.input_url,
         "canonical_url": source["html_url"],
-        "fetched_at": fetched_text,
         "source": source,
         "comments_complete": True,
         "comments_expected": expected_comments,
@@ -703,11 +702,7 @@ def _capture_discussion(
             "review_pages": 0,
             "review_comment_pages": 0,
         },
-        "raw": {
-            "discussion_pages": raw_pages,
-            "reply_pages": raw_reply_pages,
-            "comments": raw_comments,
-        },
+        "raw_file": "raw.json.gz",
     }
     artifact["text"] = _render_markdown(artifact)
 
@@ -716,11 +711,22 @@ def _capture_discussion(
     (output / "capture.json").write_text(
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    raw_payload = {
+        "discussion_pages": raw_pages,
+        "reply_pages": raw_reply_pages,
+        "comments": raw_comments,
+    }
+    (output / "raw.json.gz").write_bytes(
+        gzip.compress(
+            (json.dumps(raw_payload, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
+            mtime=0,
+        )
+    )
     envelope = {
         "flip": {
             "title": source["title"],
             "canonical_url": source["html_url"],
-            "retrieved_at": fetched_text,
+            "retrieved_at": retrieved_text,
             "strategy": "publisher-api",
             "status": "success",
             "mime": "application/json",
@@ -781,8 +787,8 @@ def capture(
             f"/repos/{target.owner}/{target.repo}/pulls/{target.number}/comments"
         )
 
-    fetched_at = (now or datetime.now(UTC)).astimezone(UTC)
-    fetched_text = fetched_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+    retrieved_at = (now or datetime.now(UTC)).astimezone(UTC)
+    retrieved_text = retrieved_at.strftime("%Y-%m-%dT%H:%M:%SZ")
     repository_url = issue.get("repository_url") or ""
     repository = repository_url.removeprefix(f"{API_ROOT}/repos/") or (
         f"{target.owner}/{target.repo}"
@@ -826,10 +832,9 @@ def capture(
         }
 
     artifact: dict[str, Any] = {
-        "schema_version": "flip.github-capture/1",
+        "schema_version": "flip.github-capture/2",
         "input_url": value,
         "canonical_url": source["html_url"],
-        "fetched_at": fetched_text,
         "source": source,
         "comments_complete": True,
         "comments_expected": expected_comments,
@@ -844,14 +849,7 @@ def capture(
             "review_pages": review_pages,
             "review_comment_pages": review_comment_pages,
         },
-        "raw": {
-            "issue": issue,
-            "pull_request": raw_pull,
-            "comments": raw_comments,
-            "reviews": raw_reviews,
-            "review_comments": raw_review_comments,
-            "timeline": raw_timeline,
-        },
+        "raw_file": "raw.json.gz",
     }
     artifact["text"] = _render_markdown(artifact)
 
@@ -862,11 +860,25 @@ def capture(
     capture_path.write_text(
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    raw_payload = {
+        "issue": issue,
+        "pull_request": raw_pull,
+        "comments": raw_comments,
+        "reviews": raw_reviews,
+        "review_comments": raw_review_comments,
+        "timeline": raw_timeline,
+    }
+    (output / "raw.json.gz").write_bytes(
+        gzip.compress(
+            (json.dumps(raw_payload, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
+            mtime=0,
+        )
+    )
     envelope = {
         "flip": {
             "title": source["title"],
             "canonical_url": source["html_url"],
-            "retrieved_at": fetched_text,
+            "retrieved_at": retrieved_text,
             "strategy": "publisher-api",
             "status": "success",
             "mime": "application/json",

@@ -1,5 +1,5 @@
 id = "github-source-refresh"
-version = "0.2"
+version = "0.3"
 summary = "Refresh a GitHub issue, pull request, or Discussion before relying on its current state."
 entry = "orient"
 

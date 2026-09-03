@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import json
 import tempfile
 import unittest
@@ -166,7 +167,11 @@ def issue_record(*, comments, state="open", pull=False):
     record = {
         "number": 7,
         "title": "Suspend drains the battery",
-        "html_url": "https://github.com/acme/widget/issues/7",
+        "html_url": (
+            "https://github.com/acme/widget/pull/7"
+            if pull
+            else "https://github.com/acme/widget/issues/7"
+        ),
         "repository_url": "https://api.github.com/repos/acme/widget",
         "comments_url": "https://api.github.com/repos/acme/widget/issues/7/comments",
         "comments": comments,
@@ -184,7 +189,106 @@ def issue_record(*, comments, state="open", pull=False):
     return record
 
 
+def rest_fixture_client(*, pull=False):
+    base = "https://api.github.com/repos/acme/widget"
+    routes = {
+        f"{base}/issues/7": Response(issue_record(comments=0, pull=pull)),
+        f"{base}/issues/7/comments?per_page=100": Response([]),
+        f"{base}/issues/7/timeline?per_page=100": Response([]),
+    }
+    if pull:
+        routes.update(
+            {
+                f"{base}/pulls/7": Response(
+                    {
+                        "merged": False,
+                        "draft": False,
+                        "base": {"label": "acme:main"},
+                        "head": {"label": "owner:fix-suspend"},
+                    }
+                ),
+                f"{base}/pulls/7/reviews?per_page=100": Response([]),
+                f"{base}/pulls/7/comments?per_page=100": Response([]),
+            }
+        )
+    return GitHubClient(opener=FixtureOpener(routes))
+
+
 class CaptureTests(unittest.TestCase):
+    def test_repeated_rest_capture_is_byte_identical_but_retrieval_time_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for route_kind in ("issues", "pull"):
+                with self.subTest(route_kind=route_kind):
+                    first = root / f"{route_kind}-first"
+                    second = root / f"{route_kind}-second"
+                    first_artifact = capture(
+                        f"https://github.com/acme/widget/{route_kind}/7",
+                        first,
+                        client=rest_fixture_client(pull=route_kind == "pull"),
+                        now=datetime(2026, 9, 2, tzinfo=UTC),
+                    )
+                    second_artifact = capture(
+                        f"https://github.com/acme/widget/{route_kind}/7",
+                        second,
+                        client=rest_fixture_client(pull=route_kind == "pull"),
+                        now=datetime(2026, 9, 3, tzinfo=UTC),
+                    )
+
+                    self.assertEqual(first_artifact, second_artifact)
+                    self.assertEqual(
+                        (first / "capture.json").read_bytes(),
+                        (second / "capture.json").read_bytes(),
+                    )
+                    self.assertNotIn("fetched_at", first_artifact)
+                    self.assertNotIn("Captured:", first_artifact["text"])
+                    self.assertEqual(first_artifact["raw_file"], "raw.json.gz")
+                    self.assertTrue((first / "raw.json.gz").is_file())
+                    self.assertIn(
+                        "Suspend is broken",
+                        gzip.decompress((first / "raw.json.gz").read_bytes()).decode(),
+                    )
+                    self.assertNotEqual(
+                        (first / "flip.json").read_bytes(),
+                        (second / "flip.json").read_bytes(),
+                    )
+                    first_sidecar = json.loads((first / "flip.json").read_text())
+                    second_sidecar = json.loads((second / "flip.json").read_text())
+                    self.assertEqual(
+                        first_sidecar["flip"]["retrieved_at"], "2026-09-02T00:00:00Z"
+                    )
+                    self.assertEqual(
+                        second_sidecar["flip"]["retrieved_at"], "2026-09-03T00:00:00Z"
+                    )
+
+    def test_repeated_discussion_capture_is_byte_identical(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "first"
+            second = root / "second"
+            first_artifact = capture(
+                "https://github.com/acme/widget/discussions/9",
+                first,
+                client=DiscussionFixtureClient(),
+                now=datetime(2026, 9, 2, tzinfo=UTC),
+            )
+            second_artifact = capture(
+                "https://github.com/acme/widget/discussions/9",
+                second,
+                client=DiscussionFixtureClient(),
+                now=datetime(2026, 9, 3, tzinfo=UTC),
+            )
+
+            self.assertEqual(first_artifact, second_artifact)
+            self.assertEqual(
+                (first / "capture.json").read_bytes(),
+                (second / "capture.json").read_bytes(),
+            )
+            self.assertNotEqual(
+                (first / "flip.json").read_bytes(),
+                (second / "flip.json").read_bytes(),
+            )
+
     def test_discussion_keeps_paginated_replies_and_chosen_answer(self):
         client = DiscussionFixtureClient()
         with tempfile.TemporaryDirectory() as tmp:
@@ -297,6 +401,53 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(artifact["source"]["state"], "merged")
         self.assertEqual(artifact["reviews"][0]["state"], "APPROVED")
         self.assertEqual(artifact["review_comments"][0]["body"], "Looks good.")
+
+    def test_unrelated_nested_repository_metadata_does_not_change_pull_capture(self):
+        first_client = rest_fixture_client(pull=True)
+        second_client = rest_fixture_client(pull=True)
+        pull_url = "https://api.github.com/repos/acme/widget/pulls/7"
+        first_client.opener.routes[pull_url] = Response(
+            {
+                "merged": False,
+                "draft": False,
+                "base": {"label": "acme:main", "repo": {"stargazers_count": 10}},
+                "head": {"label": "owner:fix-suspend", "repo": {"updated_at": "first"}},
+            }
+        )
+        second_client.opener.routes[pull_url] = Response(
+            {
+                "merged": False,
+                "draft": False,
+                "base": {"label": "acme:main", "repo": {"stargazers_count": 11}},
+                "head": {"label": "owner:fix-suspend", "repo": {"updated_at": "second"}},
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "first"
+            second = root / "second"
+            capture(
+                "https://github.com/acme/widget/pull/7",
+                first,
+                client=first_client,
+                now=datetime(2026, 9, 2, tzinfo=UTC),
+            )
+            capture(
+                "https://github.com/acme/widget/pull/7",
+                second,
+                client=second_client,
+                now=datetime(2026, 9, 3, tzinfo=UTC),
+            )
+
+            self.assertEqual(
+                (first / "capture.json").read_bytes(),
+                (second / "capture.json").read_bytes(),
+            )
+            self.assertNotEqual(
+                (first / "raw.json.gz").read_bytes(),
+                (second / "raw.json.gz").read_bytes(),
+            )
 
     def test_comment_count_mismatch_refuses_partial_capture(self):
         base = "https://api.github.com/repos/acme/widget"

@@ -19,6 +19,8 @@ current answer.
    state, every issue comment or Discussion reply, pull-request reviews and
    inline comments when present, the chosen answer, and the lifecycle timeline.
    Do not grade or cite the source from the opening body alone.
+   `raw.json.gz` keeps the complete API response for custody; do not use that
+   volatile publisher payload as the editorial change signal.
 5. Classify what the whole record establishes:
    - `open` and `closed` are repository states, not conclusions;
    - call an issue fixed only when the discussion, linked change, or owner
@@ -36,6 +38,7 @@ current answer.
    a reopen condition tied to source or release changes, and finish with
    `flip doctor`.
 
-The adapter preserves current public API responses. It cannot recover deleted
-or pre-edit content, prove that a commenter is correct, or turn repository
-closure into evidence that a fix shipped.
+The adapter preserves current public API responses in `raw.json.gz` and a
+normalized comparable record in `capture.json`. It cannot recover deleted or
+pre-edit content, prove that a commenter is correct, or turn repository closure
+into evidence that a fix shipped.

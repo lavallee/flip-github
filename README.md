@@ -17,7 +17,8 @@ after the record says otherwise.
 - pull-request merge state, reviews, and inline review comments;
 - every paginated Discussion comment and reply, plus the chosen answer;
 - lifecycle events, including closures, reopenings, and cross-references;
-- the complete raw API responses alongside a readable normalized view; and
+- the complete raw API responses in a separate custody artifact;
+- a readable normalized view that changes only with the tracked record; and
 - a Flip return envelope with the `publisher-api` capture method.
 
 The command fails if GitHub's declared issue-comment, Discussion-comment or
@@ -68,7 +69,11 @@ Open `sources/raw/<source-id>/<capture>/capture.json` and read the `source`,
 `comments`, `reviews`, `review_comments`, and `timeline` sections. Discussion
 comments contain their complete `replies` arrays, and the `discussion` block
 records answer state. The `text` field presents the same evidence as readable
-Markdown for structured-text extractors.
+Markdown for structured-text extractors. `raw.json.gz` retains the complete API
+responses separately in deterministic gzip form. Compression keeps the
+normalized `capture.json` as Flip's primary artifact; unrelated repository
+metadata in the raw custody file does not make the tracked record look
+editorially new.
 
 ## Use the Flip plugin
 
@@ -102,10 +107,12 @@ Repository state, answer state and real-world outcome are different fields:
 - later contrary reports may indicate a regression, configuration difference,
   or different failure.
 
-The capture is current as of `fetched_at`. It cannot recover deleted comments
-or earlier versions of edited text. Rechecking creates a new provenance event
-so change over time remains visible in Flip rather than overwriting the old
-record.
+The retrieval time lives in `flip.json` as `flip.retrieved_at`, outside the
+source-content payload. Volatile publisher fields unrelated to the tracked
+record remain in `raw.json.gz`. That keeps `capture.json` byte-identical when the
+issue, pull request or Discussion evidence is unchanged, while Flip can still
+record each recheck as a new provenance event. The capture cannot recover
+deleted comments or earlier versions of edited text.
 
 ## Development
 
