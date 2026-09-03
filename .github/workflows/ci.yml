@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Lint
+        run: uvx ruff check .
+      - name: Test complete-thread capture
+        run: uv run --frozen python -m unittest discover -s tests -v
+      - name: Build distributions
+        run: uv build
+      - name: Smoke-test built wheel
+        run: uv run --isolated --with dist/flip_github-*.whl flip-github --version
